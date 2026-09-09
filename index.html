@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#102a43" />
+  <title>Cuenta Juntos | Contadores compartidos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <main id="auth-view" class="auth-layout">
+    <section class="auth-intro">
+      <div class="brand brand-light"><span class="brand-mark">+</span><span>Cuenta Juntos</span></div>
+      <div class="intro-copy">
+        <p class="eyebrow">Conteo colaborativo</p>
+        <h1>Un conteo.<br /><em>Varias manos.</em></h1>
+        <p>Cuenta objetos en tiempo real con tu equipo, desde cualquier pantalla y sin perder el hilo.</p>
+      </div>
+      <div class="intro-footer"><span class="live-dot"></span> Sincronización en tiempo real con Firebase</div>
+    </section>
+    <section class="auth-panel">
+      <div class="auth-card">
+        <div class="brand"><span class="brand-mark">+</span><span>Cuenta Juntos</span></div>
+        <div class="auth-heading"><h2 id="auth-title">Bienvenido</h2><p id="auth-subtitle">Inicia sesión para ver tus contadores.</p></div>
+        <form id="auth-form">
+          <label id="name-field" class="field hidden">Nombre<input id="auth-name" type="text" autocomplete="name" placeholder="Tu nombre" /></label>
+          <label class="field">Correo electrónico<input id="auth-email" type="email" autocomplete="email" placeholder="tu@correo.com" required /></label>
+          <label class="field">Contraseña<input id="auth-password" type="password" autocomplete="current-password" placeholder="Mínimo 6 caracteres" minlength="6" required /></label>
+          <button class="button button-primary button-full" type="submit" id="auth-submit">Entrar</button>
+        </form>
+        <button class="text-button" id="auth-toggle" type="button">¿No tienes cuenta? Regístrate</button>
+        <p class="demo-note">Puedes explorar la app en modo demo sin configurar Firebase.</p>
+        <button class="button button-quiet button-full" id="demo-login" type="button">Probar modo demo</button>
+      </div>
+    </section>
+  </main>
+
+  <main id="app-view" class="app-shell hidden">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">+</span><span>Cuenta Juntos</span></div>
+      <div class="topbar-actions"><span class="connection-status"><span class="status-dot"></span><span id="connection-label">Conectado</span></span><button class="avatar" id="user-menu" type="button" title="Cerrar sesión">TU</button></div>
+    </header>
+    <div class="app-body">
+      <aside class="sidebar">
+        <div class="sidebar-heading"><div><p class="eyebrow">Tu espacio</p><h2>Contadores</h2></div><button class="icon-button" id="new-counter" type="button" title="Nuevo contador" aria-label="Nuevo contador">+</button></div>
+        <div id="counter-list" class="counter-list"></div>
+        <div class="sidebar-bottom"><div class="profile"><div class="profile-avatar" id="profile-avatar">TU</div><div><strong id="profile-name">Tu cuenta</strong><span id="profile-email">modo demo</span></div></div><button class="text-button logout-button" id="logout" type="button">Salir</button></div>
+      </aside>
+      <section class="workspace">
+        <div class="workspace-header"><div><p class="eyebrow">Contador activo</p><h1 id="counter-title">Selecciona un contador</h1><p id="counter-meta" class="muted">Crea uno para comenzar.</p></div><div class="workspace-actions"><button class="button button-secondary" id="share-counter" type="button" disabled><span>↗</span> Compartir</button><button class="icon-button danger-icon" id="delete-counter" type="button" title="Eliminar contador" aria-label="Eliminar contador" disabled>⌫</button></div></div>
+        <div id="empty-state" class="empty-state"><div class="empty-symbol">+</div><h2>Tu siguiente conteo empieza aquí</h2><p>Crea un contador y podrás invitar a otras personas para que sumen o resten al mismo tiempo.</p><button class="button button-primary" id="empty-new-counter" type="button">Crear contador</button></div>
+        <div id="counter-workspace" class="counter-workspace hidden">
+          <div class="counter-stage"><div class="stage-label"><span class="live-dot"></span> EN VIVO <span id="last-updated">Ahora</span></div><div class="count-number" id="count-number">0</div><p id="count-label">objetos contados</p><div class="counter-controls"><button class="count-button count-minus" id="decrement" type="button" aria-label="Restar uno">−</button><button class="count-button count-plus" id="increment" type="button" aria-label="Sumar uno">+</button></div><p class="keyboard-hint">También puedes usar <kbd>+</kbd> y <kbd>−</kbd> del teclado</p></div>
+          <div class="details-grid"><section class="detail-section"><div class="section-heading"><div><p class="eyebrow">Actividad</p><h2>Últimos movimientos</h2></div><span class="activity-count" id="activity-count">0</span></div><div id="activity-list" class="activity-list"></div></section><section class="detail-section"><div class="section-heading"><div><p class="eyebrow">Equipo</p><h2>Personas con acceso</h2></div><button class="small-action" id="invite-member" type="button">+ Invitar</button></div><div id="member-list" class="member-list"></div></section></div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <dialog id="counter-dialog"><form method="dialog" id="counter-form"><div class="dialog-heading"><div><p class="eyebrow">Nuevo espacio</p><h2>¿Qué vas a contar?</h2></div><button class="dialog-close" value="cancel" type="submit" aria-label="Cerrar">×</button></div><label class="field">Nombre del contador<input id="counter-name" type="text" placeholder="Ej. Cajas recibidas" required maxlength="42" /></label><label class="field">Unidad<input id="counter-unit" type="text" placeholder="objetos" value="objetos" maxlength="24" /></label><div class="dialog-actions"><button class="button button-quiet" value="cancel" type="submit">Cancelar</button><button class="button button-primary" id="create-counter-submit" value="default" type="submit">Crear contador</button></div></form></dialog>
+  <dialog id="share-dialog"><form method="dialog" id="share-form"><div class="dialog-heading"><div><p class="eyebrow">Acceso colaborativo</p><h2>Invitar a una persona</h2></div><button class="dialog-close" value="cancel" type="submit" aria-label="Cerrar">×</button></div><p class="dialog-help">La persona debe crear su cuenta primero. Después podrás añadir su correo y verá este contador automáticamente.</p><label class="field">Correo del colaborador<input id="member-email" type="email" placeholder="equipo@correo.com" required /></label><div class="dialog-actions"><button class="button button-quiet" value="cancel" type="submit">Cancelar</button><button class="button button-primary" value="default" type="submit">Dar acceso</button></div></form></dialog>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
