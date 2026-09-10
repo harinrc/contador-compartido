@@ -16,6 +16,12 @@ service cloud.firestore {
       allow read: if isOwner() || isMember();
       allow update: if isOwner() || isMember();
       allow delete: if isOwner();
+
+      match /events/{eventId} {
+        allow read, create: if signedIn() &&
+          (request.auth.uid in get(/databases/$(database)/documents/counters/$(counterId)).data.memberIds);
+        allow update, delete: if false;
+      }
     }
   }
 }
