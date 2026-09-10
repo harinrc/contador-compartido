@@ -52,9 +52,18 @@ const els = {
   globalUserRole: $('global-user-role'),
   tabAudit: $('tab-audit'),
   tabTrash: $('tab-trash'),
+  tabUsers: $('tab-users'),
   trashBadge: $('trash-badge'),
+  usersBadge: $('users-badge'),
   auditSection: $('audit-section'),
   trashSection: $('trash-section'),
+  usersSection: $('users-section'),
+  usersOwnerBanner: $('users-owner-banner'),
+  usersNonownerBanner: $('users-nonowner-banner'),
+  usersSearch: $('users-search'),
+  filterUserCounter: $('filter-user-counter'),
+  usersRecordsCount: $('users-records-count'),
+  auditRecordsCount: $('audit-records-count'),
   metricTotalEvents: $('metric-total-events'),
   metricTotalPlus: $('metric-total-plus'),
   metricTotalMinus: $('metric-total-minus'),
@@ -67,6 +76,7 @@ const els = {
   exportCsv: $('export-csv'),
   clearFilters: $('clear-filters'),
   auditTbody: $('audit-tbody'),
+  usersTbody: $('users-tbody'),
   trashGrid: $('trash-grid'),
   trashEmptyState: $('trash-empty-state'),
   emptyTrashBtn: $('empty-trash-btn'),
@@ -197,10 +207,16 @@ function switchTab(tab) {
   state.currentTab = tab;
   els.tabAudit.classList.toggle('active', tab === 'audit');
   els.tabTrash.classList.toggle('active', tab === 'trash');
+  if (els.tabUsers) els.tabUsers.classList.toggle('active', tab === 'users');
+
   els.auditSection.classList.toggle('hidden', tab !== 'audit');
   els.trashSection.classList.toggle('hidden', tab !== 'trash');
+  if (els.usersSection) els.usersSection.classList.toggle('hidden', tab !== 'users');
+
   if (tab === 'trash') {
     renderTrash();
+  } else if (tab === 'users') {
+    renderUsers();
   } else {
     renderAudit();
   }
@@ -367,6 +383,10 @@ function renderAudit() {
   updateClearFiltersButton();
   const filtered = getFilteredEvents();
   renderMetrics(filtered);
+
+  if (els.auditRecordsCount) {
+    els.auditRecordsCount.textContent = `Mostrando ${filtered.length} movimiento${filtered.length === 1 ? '' : 's'}`;
+  }
 
   els.auditTbody.innerHTML = '';
   if (!filtered.length) {
@@ -698,6 +718,7 @@ function loadDemo() {
   updateGlobalRole();
   renderAudit();
   renderTrash();
+  renderUsers();
 }
 
 function subscribeAllEvents(counters) {
@@ -745,6 +766,244 @@ function subscribeAllEvents(counters) {
   });
 }
 
+function getMemberPresence(member) {
+  const isSelf =
+    (member.userId && member.userId === state.user?.uid) ||
+    (member.email && member.email.toLowerCase() === state.user?.email?.toLowerCase()) ||
+    (state.demo && (member.name === 'Tú' || member.email === 'tú'));
+
+  if (isSelf) {
+    return { isOnline: true, text: 'En línea ahora' };
+  }
+
+  if (state.demo) {
+    if (member.isOnline) return { isOnline: true, text: 'En línea ahora' };
+    const lastTime = member.lastSeen || Date.now() - 1800000;
+    return { isOnline: false, text: `Desconectado ${timeAgo(lastTime).toLowerCase()}` };
+  }
+
+  const lastTime = timestampValue(member.lastSeen);
+  if (!lastTime) return { isOnline: false, text: 'Desconectado' };
+  const diff = Date.now() - lastTime;
+  if (member.isOnline && diff < 90000) {
+    return { isOnline: true, text: 'En línea ahora' };
+  }
+  return { isOnline: false, text: `Desconectado ${timeAgo(lastTime).toLowerCase()}` };
+}
+
+function getOwnedCounters() {
+  return state.counters.filter((c) => !c.deleted && getUserRole(c) === 'Propietario');
+}
+
+function populateUserCounterFilter() {
+  if (!els.filterUserCounter) return;
+  const currentVal = els.filterUserCounter.value;
+  const owned = getOwnedCounters();
+
+  els.filterUserCounter.innerHTML = `<option value="all">Todos mis contadores (${owned.length})</option>`;
+  owned.forEach((c) => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    els.filterUserCounter.appendChild(opt);
+  });
+
+  if (owned.some((c) => c.id === currentVal)) {
+    els.filterUserCounter.value = currentVal;
+  } else {
+    els.filterUserCounter.value = 'all';
+  }
+}
+
+function renderUsers() {
+  if (!els.usersTbody) return;
+  populateUserCounterFilter();
+
+  const ownedCounters = getOwnedCounters();
+  const isAnyOwner = ownedCounters.length > 0 || state.demo;
+
+  if (els.usersOwnerBanner) els.usersOwnerBanner.classList.toggle('hidden', !isAnyOwner);
+  if (els.usersNonownerBanner) els.usersNonownerBanner.classList.toggle('hidden', isAnyOwner);
+
+  const search = els.usersSearch?.value.trim().toLowerCase() || '';
+  const selectedCounterId = els.filterUserCounter?.value || 'all';
+
+  const userEntries = [];
+
+  ownedCounters.forEach((counter) => {
+    if (selectedCounterId !== 'all' && counter.id !== selectedCounterId) return;
+
+    (counter.members || []).forEach((member) => {
+      const isSelf =
+        (member.userId && member.userId === state.user?.uid) ||
+        (member.email && member.email.toLowerCase() === state.user?.email?.toLowerCase()) ||
+        (state.demo && (member.name === 'Tú' || member.email === 'tú'));
+
+      if (isSelf) return;
+
+      const textToMatch = `${member.name || ''} ${member.email || ''} ${counter.name || ''} ${member.role || ''}`.toLowerCase();
+      if (search && !textToMatch.includes(search)) return;
+
+      userEntries.push({
+        counterId: counter.id,
+        counterName: counter.name,
+        member
+      });
+    });
+  });
+
+  if (els.usersBadge) {
+    const uniqueEmails = new Set(
+      ownedCounters.flatMap((c) => c.members || [])
+        .filter((m) => {
+          const isSelf = (m.userId && m.userId === state.user?.uid) || (m.email && m.email === state.user?.email) || (state.demo && m.name === 'Tú');
+          return !isSelf;
+        })
+        .map((m) => m.email || m.name)
+    );
+    els.usersBadge.textContent = uniqueEmails.size;
+  }
+
+  if (els.usersRecordsCount) {
+    els.usersRecordsCount.textContent = `${userEntries.length} acceso(s) encontrado(s)`;
+  }
+
+  els.usersTbody.innerHTML = '';
+
+  if (!isAnyOwner) {
+    els.usersTbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align: center; padding: 40px; color: var(--coral-dark);">
+          🔒 Solo el Propietario tiene permisos para gestionar y eliminar usuarios de los contadores.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  if (!userEntries.length) {
+    els.usersTbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align: center; padding: 40px; color: var(--muted);">
+          No se encontraron colaboradores en tus contadores con los filtros seleccionados.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  userEntries.forEach(({ counterId, counterName, member }) => {
+    const tr = document.createElement('tr');
+    const memberRole = member.role || 'Operador';
+    const badgeClass =
+      memberRole === 'Propietario' ? 'owner' :
+      memberRole === 'Administrador' ? 'admin' :
+      memberRole === 'Operador' ? 'editor' : 'viewer';
+
+    const presence = getMemberPresence(member);
+
+    tr.innerHTML = `
+      <td>
+        <div class="user-cell">
+          <span class="user-cell-avatar">${initials(member.name || member.email)}</span>
+          <strong>${escapeHtml(member.name || member.email)}</strong>
+        </div>
+      </td>
+      <td>${escapeHtml(member.email || '—')}</td>
+      <td>
+        <span style="font-weight: 700; color: var(--navy);">
+          <span style="color: var(--coral);">#</span> ${escapeHtml(counterName)}
+        </span>
+      </td>
+      <td>
+        <span class="role-badge ${badgeClass}" style="font-size: 11px; padding: 3px 8px;">${escapeHtml(memberRole)}</span>
+      </td>
+      <td>
+        <span class="presence-label ${presence.isOnline ? 'online' : 'offline'}">${presence.isOnline ? '🟢 En línea' : `⚪ ${presence.text}`}</span>
+      </td>
+      <td style="text-align: right;">
+        <button class="button-danger remove-panel-user-btn" type="button" title="Eliminar usuario de este contador (exclusivo Propietario)">
+          ✕ Quitar Acceso
+        </button>
+      </td>
+    `;
+
+    const removeBtn = tr.querySelector('.remove-panel-user-btn');
+    if (removeBtn) {
+      removeBtn.addEventListener('click', () => removeUserFromCounter(counterId, counterName, member));
+    }
+
+    els.usersTbody.appendChild(tr);
+  });
+}
+
+async function removeUserFromCounter(counterId, counterName, member) {
+  const memberName = member.name || member.email || 'este usuario';
+  const confirmed = window.confirm(
+    `⚠️ ¿ELIMINAR ACCESO DE USUARIO?\n\n¿Estás seguro de expulsar a "${memberName}" del contador "${counterName}"?\n\nPerderá el acceso de inmediato a este contador.`
+  );
+  if (!confirmed) return;
+
+  const actorName = state.user?.displayName || state.user?.name || (state.demo ? 'Tú' : 'Propietario');
+  const now = Date.now();
+
+  if (state.demo) {
+    const data = demoData();
+    const target = data.counters.find((c) => c.id === counterId);
+    if (target) {
+      target.members = (target.members || []).filter((m) => {
+        if (member.userId && m.userId) return m.userId !== member.userId;
+        return m.email?.toLowerCase() !== member.email?.toLowerCase();
+      });
+      if (member.userId) {
+        target.memberIds = (target.memberIds || []).filter((id) => id !== member.userId);
+      }
+      target.activity = [
+        ...(target.activity || []),
+        { delta: 0, by: actorName, detail: `Eliminó el acceso a ${memberName}`, at: now }
+      ];
+      target.updatedAt = now;
+      saveDemo(data);
+      state.counters = data.counters;
+      collectAllDemoEvents();
+      renderUsers();
+      renderAudit();
+      showToast(`Usuario "${memberName}" eliminado de "${counterName}".`);
+    }
+    return;
+  }
+
+  try {
+    const target = state.counters.find((c) => c.id === counterId);
+    if (!target) return;
+
+    const remainingMembers = (target.members || []).filter((m) => {
+      if (member.userId && m.userId) return m.userId !== member.userId;
+      return m.email?.toLowerCase() !== member.email?.toLowerCase();
+    });
+    const remainingIds = (target.memberIds || []).filter((id) => id !== member.userId);
+
+    await updateDoc(doc(db, 'counters', counterId), {
+      members: remainingMembers,
+      memberIds: remainingIds,
+      updatedAt: serverTimestamp()
+    });
+
+    await addDoc(collection(db, 'counters', counterId, 'events'), {
+      delta: 0,
+      by: actorName,
+      actorId: state.user.uid,
+      detail: `Eliminó el acceso a ${memberName}`,
+      createdAt: serverTimestamp()
+    });
+
+    showToast(`Usuario "${memberName}" eliminado de "${counterName}".`);
+  } catch (err) {
+    console.error('Error al eliminar usuario:', err);
+    showToast('No se pudo eliminar al usuario.', true);
+  }
+}
+
 function loadFirebaseData() {
   if (state.unsubscribeCounters) state.unsubscribeCounters();
 
@@ -761,6 +1020,7 @@ function loadFirebaseData() {
       updateGlobalRole();
       subscribeAllEvents(state.counters);
       renderTrash();
+      renderUsers();
     },
     () => showToast('No se pudieron sincronizar los contadores.', true)
   );
@@ -769,6 +1029,15 @@ function loadFirebaseData() {
 // Event Listeners
 els.tabAudit.addEventListener('click', () => switchTab('audit'));
 els.tabTrash.addEventListener('click', () => switchTab('trash'));
+if (els.tabUsers) {
+  els.tabUsers.addEventListener('click', () => switchTab('users'));
+}
+if (els.usersSearch) {
+  els.usersSearch.addEventListener('input', renderUsers);
+}
+if (els.filterUserCounter) {
+  els.filterUserCounter.addEventListener('change', renderUsers);
+}
 els.auditSearch.addEventListener('input', renderAudit);
 els.filterCounter.addEventListener('change', renderAudit);
 els.filterAction.addEventListener('change', renderAudit);

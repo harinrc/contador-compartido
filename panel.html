@@ -54,6 +54,10 @@
         🗑️ Papelera de Reciclaje (30 días)
         <span class="tab-counter" id="trash-badge">0</span>
       </button>
+      <button class="tab-btn" id="tab-users" type="button">
+        👥 Gestión de Usuarios
+        <span class="tab-counter" id="users-badge">0</span>
+      </button>
     </nav>
 
     <!-- SECTION 1: GLOBAL AUDIT -->
@@ -119,27 +123,38 @@
         </div>
       </div>
 
-      <div class="audit-table-wrapper">
-        <table class="audit-table">
-          <thead>
-            <tr>
-              <th>Fecha y Hora</th>
-              <th>Contador</th>
-              <th>Usuario</th>
-              <th style="text-align: center;">Acción</th>
-              <th>Cantidad</th>
-              <th>Detalle / Operación</th>
-              <th>Antigüedad</th>
-            </tr>
-          </thead>
-          <tbody id="audit-tbody">
-            <tr>
-              <td colspan="7" style="text-align: center; padding: 36px; color: var(--muted);">
-                Cargando movimientos de la base de datos...
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="audit-window-card">
+        <div class="audit-window-header">
+          <div class="window-title-row">
+            <span class="window-status-dot"></span>
+            <strong>Ventana Deslizable de Movimientos</strong>
+            <span class="window-scroll-hint">↕ Scroll vertical y horizontal</span>
+          </div>
+          <span class="audit-records-count" id="audit-records-count">Mostrando 0 movimientos</span>
+        </div>
+
+        <div class="audit-table-wrapper" id="audit-table-wrapper">
+          <table class="audit-table">
+            <thead>
+              <tr>
+                <th>Fecha y Hora</th>
+                <th>Contador</th>
+                <th>Usuario</th>
+                <th style="text-align: center;">Acción</th>
+                <th>Cantidad</th>
+                <th>Detalle / Operación</th>
+                <th>Antigüedad</th>
+              </tr>
+            </thead>
+            <tbody id="audit-tbody">
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 36px; color: var(--muted);">
+                  Cargando movimientos de la base de datos...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -157,11 +172,74 @@
         </div>
       </div>
 
-      <div id="trash-grid" class="trash-grid"></div>
+      <div class="trash-scroll-container">
+        <div id="trash-grid" class="trash-grid"></div>
+      </div>
       <div id="trash-empty-state" class="empty-state-card hidden">
         <div class="empty-symbol">🗑️</div>
         <h2>La papelera está vacía</h2>
         <p>No hay contadores eliminados en este momento. Cuando se elimine un contador, se conservará aquí por 30 días.</p>
+      </div>
+    </section>
+
+    <!-- SECTION 3: USERS MANAGEMENT (OWNER ONLY) -->
+    <section id="users-section" class="hidden">
+      <div class="users-banner" id="users-owner-banner">
+        <div>
+          <strong>👑 Zona Exclusiva del Propietario: Control y Eliminación de Usuarios</strong>
+          <span>Solo el Propietario tiene permisos para revocar accesos y expulsar usuarios o colaboradores de sus contadores.</span>
+        </div>
+      </div>
+      <div class="users-banner warning hidden" id="users-nonowner-banner">
+        <div>
+          <strong>🔒 Acceso Restringido</strong>
+          <span>Solo el Propietario del sistema tiene permisos para gestionar y eliminar usuarios de los contadores.</span>
+        </div>
+      </div>
+
+      <div class="panel-filters-bar">
+        <div class="filter-group search-group">
+          <label for="users-search">Búsqueda de usuarios</label>
+          <input id="users-search" class="filter-input" type="search" placeholder="Buscar por nombre, correo o contador..." />
+        </div>
+        <div class="filter-group">
+          <label for="filter-user-counter">Filtrar por contador</label>
+          <select id="filter-user-counter" class="filter-select">
+            <option value="all">Todos mis contadores</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="audit-window-card">
+        <div class="audit-window-header">
+          <div class="window-title-row">
+            <span class="window-status-dot"></span>
+            <strong>Directorio de Colaboradores con Acceso</strong>
+            <span class="window-scroll-hint">↕ Deslizable</span>
+          </div>
+          <span class="audit-records-count" id="users-records-count">0 colaboradores encontrados</span>
+        </div>
+        <div class="audit-table-wrapper users-table-wrapper">
+          <table class="audit-table users-table">
+            <thead>
+              <tr>
+                <th>Colaborador</th>
+                <th>Correo</th>
+                <th>Contador Asociado</th>
+                <th>Rol</th>
+                <th>Estado</th>
+                <th style="text-align: right;">Acciones (Solo Propietario)</th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody">
+              <tr>
+                <td colspan="6" style="text-align: center; padding: 36px; color: var(--muted);">
+                  Cargando colaboradores...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   </main>

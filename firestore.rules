@@ -14,12 +14,17 @@ service cloud.firestore {
     match /counters/{counterId} {
       allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
       allow read: if isOwner() || isMember();
-      allow update: if isOwner() || isMember();
+      allow update: if isOwner() || (
+        isMember() &&
+        request.resource.data.ownerId == resource.data.ownerId &&
+        request.resource.data.memberIds == resource.data.memberIds
+      );
       allow delete: if isOwner();
 
       match /events/{eventId} {
         allow read, create: if signedIn() &&
-          (request.auth.uid in get(/databases/$(database)/documents/counters/$(counterId)).data.memberIds);
+          ((request.auth.uid in get(/databases/$(database)/documents/counters/$(counterId)).data.memberIds) ||
+           request.auth.uid == get(/databases/$(database)/documents/counters/$(counterId)).data.ownerId);
         allow update, delete: if false;
       }
 

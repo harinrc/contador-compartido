@@ -107,6 +107,8 @@ const els = {
   chatCounterSubtitle: $('chat-counter-subtitle'),
   chatMessagesList: $('chat-messages-list'),
   chatWelcome: $('chat-welcome'),
+  chatScrollBottom: $('chat-scroll-bottom'),
+  chatScrollBadge: $('chat-scroll-badge'),
   chatTypingIndicator: $('chat-typing-indicator'),
   chatTypingText: $('chat-typing-text'),
   chatForm: $('chat-form'),
@@ -163,8 +165,9 @@ function initials(name = 'Tu cuenta') {
 
 function timeAgo(date) {
   if (!date) return 'Ahora';
-  const value = date.toDate ? date.toDate() : new Date(date);
-  const seconds = Math.floor((Date.now() - value.getTime()) / 1000);
+  const time = timestampValue(date);
+  if (!time) return 'Ahora';
+  const seconds = Math.floor((Date.now() - time) / 1000);
   if (seconds < 60) return 'Ahora';
   if (seconds < 3600) return `Hace ${Math.floor(seconds / 60)} min`;
   if (seconds < 86400) return `Hace ${Math.floor(seconds / 3600)} h`;
@@ -173,7 +176,23 @@ function timeAgo(date) {
 
 function timestampValue(value) {
   if (!value) return 0;
-  const date = value.toDate ? value.toDate() : new Date(value);
+  if (typeof value === 'number') return value;
+  if (value instanceof Date) {
+    const t = value.getTime();
+    return Number.isNaN(t) ? 0 : t;
+  }
+  if (typeof value.toDate === 'function') {
+    const d = value.toDate();
+    return d ? d.getTime() : 0;
+  }
+  if (typeof value.seconds === 'number') {
+    return value.seconds * 1000;
+  }
+  if (typeof value === 'object') {
+    if (value.createdAt) return timestampValue(value.createdAt);
+    if (value.at) return timestampValue(value.at);
+  }
+  const date = new Date(value);
   return Number.isNaN(date.getTime()) ? 0 : date.getTime();
 }
 
@@ -185,15 +204,15 @@ function formatDate(value) {
 }
 
 function formatDateTime(value) {
-  const time = timestampValue(value);
-  return time
-    ? new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium', timeStyle: 'medium' }).format(new Date(time))
-    : 'Registrando...';
+  const time = timestampValue(value) || Date.now();
+  return new Intl.DateTimeFormat('es-ES', {
+    dateStyle: 'medium',
+    timeStyle: 'medium'
+  }).format(new Date(time));
 }
 
 function formatMessageTime(value) {
-  const time = timestampValue(value);
-  if (!time) return 'Ahora';
+  const time = timestampValue(value) || Date.now();
   const d = new Date(time);
   const hours = String(d.getHours()).padStart(2, '0');
   const minutes = String(d.getMinutes()).padStart(2, '0');
@@ -201,8 +220,8 @@ function formatMessageTime(value) {
 }
 
 function formatTimeOnly(time) {
-  if (!time) return '';
-  const d = new Date(time);
+  const val = timestampValue(time) || Date.now();
+  const d = new Date(val);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
@@ -528,9 +547,9 @@ function renderActiveCounter(counter) {
 }
 
 function eventDate(item) {
-  if (item.createdAt?.toDate) return item.createdAt.toDate();
-  if (item.at) return new Date(item.at);
-  return null;
+  if (!item) return null;
+  const time = timestampValue(item.createdAt || item.at);
+  return time ? new Date(time) : null;
 }
 
 function renderActivity() {
@@ -563,13 +582,16 @@ function renderActivity() {
       actionDesc = item.detail || 'Actualización de configuración';
     }
 
+    const itemDate = eventDate(item) || new Date();
+    const formattedDate = formatDateTime(itemDate);
+
     row.innerHTML = `
       <span class="activity-symbol${symbolClass}">${symbol}</span>
       <span class="activity-text">
         <strong>${escapeHtml(item.by || 'Alguien')}</strong> ${actionDesc}
-        <small>${formatDateTime(item)}</small>
+        <small class="activity-datetime-label">🕒 ${formattedDate}</small>
       </span>
-      <span class="activity-time">${timeAgo(eventDate(item))}</span>
+      <span class="activity-time">${timeAgo(itemDate)}</span>
     `;
     els.activityList.appendChild(row);
   });
@@ -657,6 +679,8 @@ function startPresenceTracking() {
 function renderMembers(counter) {
   els.memberList.innerHTML = '';
   const members = counter.members || [{ name: 'Tú', email: state.user?.email || 'modo demo', role: 'Propietario', isOnline: true, lastSeen: Date.now() }];
+  const currentRole = getUserRole(counter);
+  const isOwner = currentRole === 'Propietario';
 
   members.forEach((member) => {
     const row = document.createElement('div');
@@ -668,6 +692,20 @@ function renderMembers(counter) {
       memberRole === 'Operador' ? 'editor' : 'viewer';
 
     const presence = getMemberPresence(member);
+
+    const isSelf =
+      (member.userId && member.userId === state.user?.uid) ||
+      (member.email && member.email.toLowerCase() === state.user?.email?.toLowerCase()) ||
+      (state.demo && (member.name === 'Tú' || member.email === 'tú'));
+
+    let removeBtnHtml = '';
+    if (isOwner && !isSelf) {
+      removeBtnHtml = `
+        <button class="member-remove-btn" type="button" title="Eliminar usuario de este contador (solo Propietario)" aria-label="Eliminar usuario">
+          ✕ Quitar
+        </button>
+      `;
+    }
 
     row.innerHTML = `
       <div class="member-avatar-wrapper">
@@ -684,9 +722,88 @@ function renderMembers(counter) {
           · ${escapeHtml(member.email || '')}
         </span>
       </div>
+      ${removeBtnHtml}
     `;
+
+    if (isOwner && !isSelf) {
+      const btn = row.querySelector('.member-remove-btn');
+      if (btn) {
+        btn.addEventListener('click', () => removeMember(counter, member));
+      }
+    }
+
     els.memberList.appendChild(row);
   });
+}
+
+async function removeMember(counter, member) {
+  const currentRole = getUserRole(counter);
+  if (currentRole !== 'Propietario') {
+    return showToast('Solo el Propietario tiene permisos para eliminar usuarios.', true);
+  }
+
+  const memberName = member.name || member.email || 'este usuario';
+  const confirmed = window.confirm(
+    `¿Deseas eliminar a "${memberName}" de este contador?\n\nPerderá el acceso y ya no podrá ver ni modificar este contador.`
+  );
+  if (!confirmed) return;
+
+  const actorName = state.user?.displayName || state.user?.name || (state.demo ? 'Tú' : 'Propietario');
+  const now = Date.now();
+
+  if (state.demo) {
+    const data = demoData();
+    const target = data.counters.find((c) => c.id === counter.id);
+    if (target) {
+      target.members = (target.members || []).filter((m) => {
+        if (member.userId && m.userId) return m.userId !== member.userId;
+        return m.email?.toLowerCase() !== member.email?.toLowerCase();
+      });
+      if (member.userId) {
+        target.memberIds = (target.memberIds || []).filter((id) => id !== member.userId);
+      }
+      target.activity = [
+        ...(target.activity || []),
+        { delta: 0, by: actorName, detail: `Eliminó el acceso a ${memberName}`, at: now }
+      ];
+      target.updatedAt = now;
+      saveDemo(data);
+      state.counters = data.counters;
+      state.activeCounter = target;
+      state.events = (target.activity || []).slice().reverse();
+      renderCounterList();
+      renderActiveCounter(target);
+      showToast(`Usuario "${memberName}" eliminado del contador.`);
+    }
+    return;
+  }
+
+  try {
+    const remainingMembers = (counter.members || []).filter((m) => {
+      if (member.userId && m.userId) return m.userId !== member.userId;
+      return m.email?.toLowerCase() !== member.email?.toLowerCase();
+    });
+    const remainingIds = (counter.memberIds || []).filter((id) => id !== member.userId);
+
+    await updateDoc(doc(db, 'counters', counter.id), {
+      members: remainingMembers,
+      memberIds: remainingIds,
+      updatedAt: serverTimestamp()
+    });
+
+    await addDoc(collection(db, 'counters', counter.id, 'events'), {
+      delta: 0,
+      by: actorName,
+      actorId: state.user.uid,
+      detail: `Eliminó el acceso a ${memberName}`,
+      createdAt: serverTimestamp()
+    });
+
+    showToast(`Usuario "${memberName}" eliminado del contador.`);
+  } catch (err) {
+    console.error('Error al eliminar usuario:', err);
+    showToast('No se pudo eliminar al usuario.', true);
+  }
 }
 
 /* ================= CHAT EN TIEMPO REAL ================= */
@@ -750,23 +867,49 @@ function markMessagesAsRead(counterId) {
   });
 }
 
-function renderChatMessages() {
+function formatDateSeparator(timestamp) {
+  const date = new Date(timestamp);
+  const today = new Date();
+  if (date.toDateString() === today.toDateString()) return 'Hoy';
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return 'Ayer';
+  return new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium' }).format(date);
+}
+
+function renderChatMessages(forceScrollBottom = false) {
   const list = els.chatMessagesList;
+  if (!list) return;
+
+  const wasNearBottom = list.scrollHeight - list.scrollTop - list.clientHeight <= 90;
   list.innerHTML = '';
 
   if (!state.chatMessages.length) {
     list.appendChild(els.chatWelcome);
+    if (els.chatScrollBottom) els.chatScrollBottom.classList.add('hidden');
     return;
   }
 
   const myUid = state.user?.uid || 'demo';
+  let lastDay = '';
 
   state.chatMessages.forEach((msg) => {
+    const msgTime = timestampValue(msg.createdAt || msg.at) || Date.now();
+    const dayStr = new Date(msgTime).toDateString();
+
+    if (dayStr !== lastDay) {
+      lastDay = dayStr;
+      const sep = document.createElement('div');
+      sep.className = 'chat-date-separator';
+      sep.innerHTML = `<span>${formatDateSeparator(msgTime)}</span>`;
+      list.appendChild(sep);
+    }
+
     const isMine = msg.senderId === myUid;
     const item = document.createElement('div');
     item.className = `chat-msg ${isMine ? 'mine' : 'theirs'}`;
 
-    const timeStr = formatMessageTime(msg.createdAt || msg.at);
+    const timeStr = formatMessageTime(msgTime);
 
     let seenHtml = '';
     if (isMine) {
@@ -779,18 +922,33 @@ function renderChatMessages() {
       }
     }
 
+    const senderName = msg.senderName || 'Colaborador';
+    const avatarHtml = isMine
+      ? ''
+      : `<span class="chat-msg-avatar" title="${escapeHtml(senderName)}">${initials(senderName)}</span>`;
+
     item.innerHTML = `
-      <span class="chat-msg-author">${escapeHtml(msg.senderName || 'Colaborador')}</span>
-      <div class="chat-msg-bubble">${escapeHtml(msg.text)}</div>
-      <div class="chat-msg-meta">
-        <span>${timeStr}</span>
-        ${seenHtml}
+      ${avatarHtml}
+      <div class="chat-msg-body">
+        ${!isMine ? `<span class="chat-msg-author">${escapeHtml(senderName)}</span>` : ''}
+        <div class="chat-msg-bubble">${escapeHtml(msg.text)}</div>
+        <div class="chat-msg-meta">
+          <span>${timeStr}</span>
+          ${seenHtml}
+        </div>
       </div>
     `;
     list.appendChild(item);
   });
 
-  list.scrollTop = list.scrollHeight;
+  if (forceScrollBottom || wasNearBottom) {
+    requestAnimationFrame(() => {
+      list.scrollTo({ top: list.scrollHeight, behavior: forceScrollBottom ? 'auto' : 'smooth' });
+    });
+    if (els.chatScrollBottom) els.chatScrollBottom.classList.add('hidden');
+  } else {
+    if (els.chatScrollBottom) els.chatScrollBottom.classList.remove('hidden');
+  }
 }
 
 function subscribeCounterChat(counterId) {
@@ -886,7 +1044,7 @@ async function sendChatMessage(event) {
       target.messages = [...(target.messages || []), message];
       saveDemo(data);
       state.chatMessages = target.messages;
-      renderChatMessages();
+      renderChatMessages(true);
       markMessagesAsRead(target.id);
     }
     return;
@@ -897,6 +1055,7 @@ async function sendChatMessage(event) {
       ...message,
       createdAt: serverTimestamp()
     });
+    renderChatMessages(true);
     markMessagesAsRead(state.activeCounter.id);
   } catch {
     showToast('No se pudo enviar el mensaje.', true);
@@ -910,7 +1069,7 @@ function openChat() {
   const count = (state.activeCounter.members || []).length;
   els.chatCounterSubtitle.textContent = `${count} participante${count === 1 ? '' : 's'} · En tiempo real`;
   els.chatDialog.showModal();
-  renderChatMessages();
+  renderChatMessages(true);
   markMessagesAsRead(state.activeCounter.id);
   els.chatInput.focus();
 }
@@ -1313,6 +1472,20 @@ if (els.chatInput) {
     emitTyping(true);
     if (state.typingTimer) clearTimeout(state.typingTimer);
     state.typingTimer = setTimeout(() => emitTyping(false), 3000);
+  });
+}
+if (els.chatMessagesList) {
+  els.chatMessagesList.addEventListener('scroll', () => {
+    const isNearBottom = els.chatMessagesList.scrollHeight - els.chatMessagesList.scrollTop - els.chatMessagesList.clientHeight <= 80;
+    if (els.chatScrollBottom) {
+      els.chatScrollBottom.classList.toggle('hidden', isNearBottom);
+    }
+  }, { passive: true });
+}
+if (els.chatScrollBottom) {
+  els.chatScrollBottom.addEventListener('click', () => {
+    els.chatMessagesList.scrollTo({ top: els.chatMessagesList.scrollHeight, behavior: 'smooth' });
+    els.chatScrollBottom.classList.add('hidden');
   });
 }
 
