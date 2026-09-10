@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel de Control y Auditoría · Cuenta Juntos</title>
+  <meta name="description" content="Historial global de movimientos y papelera de reciclaje con retención de 30 días." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%23ef6b5b'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' font-size='60' fill='white' font-family='sans-serif'>%2B</text></svg>" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <a href="index.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;">
+        <span class="brand-mark">+</span>
+        <span>Cuenta Juntos</span>
+      </a>
+    </div>
+    <div class="topbar-actions">
+      <a href="index.html" class="button button-secondary panel-button" title="Volver al espacio de trabajo">
+        ← Volver a Contadores
+      </a>
+      <span class="connection-status">
+        <span class="status-dot"></span>
+        <span id="connection-label">Conectado</span>
+      </span>
+      <button class="avatar" id="user-menu" type="button" title="Cerrar sesión">TU</button>
+    </div>
+  </header>
+
+  <main class="panel-container">
+    <header class="panel-header">
+      <div class="panel-header-copy">
+        <p class="eyebrow">Centro de Administración</p>
+        <h1>Panel de Control y Auditoría</h1>
+        <p>Monitoreo global de actividad en tiempo real, trazabilidad de usuarios y papelera de reciclaje con retención de 30 días.</p>
+      </div>
+      <div class="user-role-indicator">
+        <span style="font-size: 12px; color: var(--muted); margin-right: 6px;">Tu perfil:</span>
+        <strong id="panel-user-name" style="font-size: 13px; margin-right: 8px;">Tú</strong>
+        <span id="global-user-role" class="role-badge owner">Propietario</span>
+      </div>
+    </header>
+
+    <nav class="panel-tabs" aria-label="Pestañas del panel">
+      <button class="tab-btn active" id="tab-audit" type="button">
+        📋 Historial Global de Movimientos
+      </button>
+      <button class="tab-btn" id="tab-trash" type="button">
+        🗑️ Papelera de Reciclaje (30 días)
+        <span class="tab-counter" id="trash-badge">0</span>
+      </button>
+    </nav>
+
+    <!-- SECTION 1: GLOBAL AUDIT -->
+    <section id="audit-section">
+      <div class="metrics-grid">
+        <article class="metric-card">
+          <p class="eyebrow">Trazabilidad total</p>
+          <div class="metric-value" id="metric-total-events">0</div>
+          <p class="metric-sub">Movimientos registrados</p>
+        </article>
+        <article class="metric-card">
+          <p class="eyebrow">Volumen agregado</p>
+          <div class="metric-value" style="color: #237a60;" id="metric-total-plus">+0</div>
+          <p class="metric-sub">Unidades sumadas</p>
+        </article>
+        <article class="metric-card">
+          <p class="eyebrow">Volumen deducido</p>
+          <div class="metric-value" style="color: var(--coral-dark);" id="metric-total-minus">−0</div>
+          <p class="metric-sub">Unidades restadas</p>
+        </article>
+        <article class="metric-card">
+          <p class="eyebrow">Ecosistema activo</p>
+          <div class="metric-value" id="metric-active-counters">0</div>
+          <p class="metric-sub">Contadores activos en uso</p>
+        </article>
+      </div>
+
+      <div class="panel-filters-bar">
+        <div class="filter-group search-group">
+          <label for="audit-search">Búsqueda general</label>
+          <input id="audit-search" class="filter-input" type="search" placeholder="Buscar por usuario, acción o contador..." />
+        </div>
+        <div class="filter-group">
+          <label for="filter-counter">Filtrar por contador</label>
+          <select id="filter-counter" class="filter-select">
+            <option value="all">Todos los contadores</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-action">Tipo de acción</label>
+          <select id="filter-action" class="filter-select">
+            <option value="all">Todas las acciones</option>
+            <option value="plus">Solo sumas (+)</option>
+            <option value="minus">Solo restas (−)</option>
+            <option value="other">Ajustes y papelera</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-date-from">Desde</label>
+          <input id="filter-date-from" class="filter-input" type="date" />
+        </div>
+        <div class="filter-group">
+          <label for="filter-date-to">Hasta</label>
+          <input id="filter-date-to" class="filter-input" type="date" />
+        </div>
+        <div>
+          <button class="csv-btn" id="export-csv" type="button" title="Descargar historial filtrado en archivo CSV">
+            📥 Exportar CSV
+          </button>
+        </div>
+      </div>
+
+      <div class="audit-table-wrapper">
+        <table class="audit-table">
+          <thead>
+            <tr>
+              <th>Fecha y Hora</th>
+              <th>Contador</th>
+              <th>Usuario</th>
+              <th style="text-align: center;">Acción</th>
+              <th>Cantidad</th>
+              <th>Detalle / Operación</th>
+              <th>Antigüedad</th>
+            </tr>
+          </thead>
+          <tbody id="audit-tbody">
+            <tr>
+              <td colspan="7" style="text-align: center; padding: 36px; color: var(--muted);">
+                Cargando movimientos de la base de datos...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SECTION 2: TRASH BIN -->
+    <section id="trash-section" class="hidden">
+      <div class="trash-banner">
+        <div>
+          <strong>ℹ️ Política de Retención Automática (30 Días)</strong>
+          <span>Los contadores eliminados se guardan aquí durante 30 días y pueden ser restaurados en cualquier momento por Administradores o el Propietario. Al expirar los 30 días o por acción directa del Propietario, se borran definitivamente.</span>
+        </div>
+        <div class="trash-actions">
+          <button class="button-danger" id="empty-trash-btn" type="button" title="Solo el Propietario puede vaciar la papelera definitivamente">
+            🗑️ Vaciar Papelera
+          </button>
+        </div>
+      </div>
+
+      <div id="trash-grid" class="trash-grid"></div>
+      <div id="trash-empty-state" class="empty-state-card hidden">
+        <div class="empty-symbol">🗑️</div>
+        <h2>La papelera está vacía</h2>
+        <p>No hay contadores eliminados en este momento. Cuando se elimine un contador, se conservará aquí por 30 días.</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="panel.js"></script>
+</body>
+</html>
