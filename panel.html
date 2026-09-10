@@ -108,9 +108,12 @@
           <label for="filter-date-to">Hasta</label>
           <input id="filter-date-to" class="filter-input" type="date" />
         </div>
-        <div>
+        <div class="filter-actions-group">
           <button class="csv-btn" id="export-csv" type="button" title="Descargar historial filtrado en archivo CSV">
             📥 Exportar CSV
+          </button>
+          <button class="button button-quiet clear-filters-btn hidden" id="clear-filters" type="button" title="Restablecer todos los filtros">
+            ✕ Limpiar filtros
           </button>
         </div>
       </div>

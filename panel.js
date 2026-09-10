@@ -64,6 +64,7 @@ const els = {
   filterDateFrom: $('filter-date-from'),
   filterDateTo: $('filter-date-to'),
   exportCsv: $('export-csv'),
+  clearFilters: $('clear-filters'),
   auditTbody: $('audit-tbody'),
   trashGrid: $('trash-grid'),
   trashEmptyState: $('trash-empty-state'),
@@ -204,17 +205,108 @@ function switchTab(tab) {
   }
 }
 
+function getAvailableCountersForFilters() {
+  const from = els.filterDateFrom.value ? new Date(`${els.filterDateFrom.value}T00:00:00`) : null;
+  const to = els.filterDateTo.value ? new Date(`${els.filterDateTo.value}T23:59:59`) : null;
+
+  const counterMap = new Map();
+
+  state.allEvents.forEach((ev) => {
+    const evTime = timestampValue(ev.createdAt || ev.at);
+    const evDate = evTime ? new Date(evTime) : null;
+    const matchesFrom = !from || (evDate && evDate >= from);
+    const matchesTo = !to || (evDate && evDate <= to);
+
+    if (matchesFrom && matchesTo && ev.counterId) {
+      const current = counterMap.get(ev.counterId) || 0;
+      counterMap.set(ev.counterId, current + 1);
+    }
+  });
+
+  if (!from && !to) {
+    return state.counters.map((c) => ({
+      ...c,
+      eventCount: counterMap.get(c.id) || 0
+    }));
+  }
+
+  // Check if counter was created in that date range even without movements
+  state.counters.forEach((c) => {
+    const createdTime = timestampValue(c.createdAt);
+    const createdDate = createdTime ? new Date(createdTime) : null;
+    const matchesFrom = !from || (createdDate && createdDate >= from);
+    const matchesTo = !to || (createdDate && createdDate <= to);
+    if (matchesFrom && matchesTo && !counterMap.has(c.id)) {
+      counterMap.set(c.id, 0);
+    }
+  });
+
+  return state.counters
+    .filter((c) => counterMap.has(c.id))
+    .map((c) => ({
+      ...c,
+      eventCount: counterMap.get(c.id) || 0
+    }));
+}
+
+function updateClearFiltersButton() {
+  if (!els.clearFilters) return;
+  const hasFilter = Boolean(
+    els.auditSearch.value.trim() ||
+    els.filterCounter.value !== 'all' ||
+    els.filterAction.value !== 'all' ||
+    els.filterDateFrom.value ||
+    els.filterDateTo.value
+  );
+  els.clearFilters.classList.toggle('hidden', !hasFilter);
+}
+
+function clearAllFilters() {
+  els.auditSearch.value = '';
+  els.filterDateFrom.value = '';
+  els.filterDateTo.value = '';
+  els.filterAction.value = 'all';
+  populateCounterFilter();
+  els.filterCounter.value = 'all';
+  renderAudit();
+  showToast('Filtros restablecidos');
+}
+
 function populateCounterFilter() {
   const currentVal = els.filterCounter.value;
-  els.filterCounter.innerHTML = '<option value="all">Todos los contadores</option>';
-  state.counters.forEach((counter) => {
+  const hasDateFilter = Boolean(els.filterDateFrom.value || els.filterDateTo.value);
+  const available = getAvailableCountersForFilters();
+
+  els.filterCounter.innerHTML = '';
+
+  const defaultOpt = document.createElement('option');
+  defaultOpt.value = 'all';
+  defaultOpt.textContent = hasDateFilter
+    ? `Todos los contadores en este rango (${available.length})`
+    : `Todos los contadores (${state.counters.length})`;
+  els.filterCounter.appendChild(defaultOpt);
+
+  if (hasDateFilter && !available.length) {
+    const noneOpt = document.createElement('option');
+    noneOpt.value = 'none';
+    noneOpt.disabled = true;
+    noneOpt.textContent = 'Ningún contador activo en estas fechas';
+    els.filterCounter.appendChild(noneOpt);
+  }
+
+  available.forEach((counter) => {
     const opt = document.createElement('option');
     opt.value = counter.id;
-    opt.textContent = `${counter.name} ${counter.deleted ? '(En papelera)' : ''}`;
+    const extra = counter.eventCount > 0 ? ` (${counter.eventCount} mov.)` : ' (0 mov.)';
+    const inTrash = counter.deleted ? ' [Papelera]' : '';
+    opt.textContent = `${counter.name}${inTrash}${extra}`;
     els.filterCounter.appendChild(opt);
   });
-  if (state.counters.some((c) => c.id === currentVal)) {
+
+  if (available.some((c) => c.id === currentVal)) {
     els.filterCounter.value = currentVal;
+  } else {
+    els.filterCounter.value = 'all';
   }
 }
 
@@ -228,7 +320,10 @@ function renderMetrics(filteredEvents) {
     if (ev.delta < 0) totalMinus += Math.abs(ev.delta);
   });
 
-  const activeCountersCount = state.counters.filter((c) => !c.deleted).length;
+  const hasDateFilter = Boolean(els.filterDateFrom.value || els.filterDateTo.value);
+  const activeCountersCount = hasDateFilter
+    ? getAvailableCountersForFilters().filter((c) => !c.deleted).length
+    : state.counters.filter((c) => !c.deleted).length;
 
   els.metricTotalEvents.textContent = totalEvents.toLocaleString('es-ES');
   els.metricTotalPlus.textContent = `+${totalPlus.toLocaleString('es-ES')}`;
@@ -268,15 +363,18 @@ function getFilteredEvents() {
 }
 
 function renderAudit() {
+  updateClearFiltersButton();
   const filtered = getFilteredEvents();
   renderMetrics(filtered);
 
   els.auditTbody.innerHTML = '';
   if (!filtered.length) {
+    const hasDateFilter = Boolean(els.filterDateFrom.value || els.filterDateTo.value);
+    const dateHelp = hasDateFilter ? ' Intenta ampliar o borrar las fechas seleccionadas.' : '';
     els.auditTbody.innerHTML = `
       <tr>
         <td colspan="7" style="text-align: center; padding: 40px; color: var(--muted);">
-          No se encontraron movimientos con los filtros seleccionados.
+          No se encontraron movimientos con los filtros seleccionados.${dateHelp}
         </td>
       </tr>
     `;
@@ -353,15 +451,23 @@ function exportCsvFile() {
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  const nowStr = new Date().toISOString().slice(0, 10);
+
+  const fromStr = els.filterDateFrom.value;
+  const toStr = els.filterDateTo.value;
+  let rangeTag = '';
+  if (fromStr && toStr) rangeTag = `_${fromStr}_al_${toStr}`;
+  else if (fromStr) rangeTag = `_desde_${fromStr}`;
+  else if (toStr) rangeTag = `_hasta_${toStr}`;
+  else rangeTag = `_completo`;
+
   link.setAttribute('href', url);
-  link.setAttribute('download', `reporte-auditoria-cuenta-juntos-${nowStr}.csv`);
+  link.setAttribute('download', `reporte-auditoria-cuenta-juntos${rangeTag}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 
-  showToast('Reporte CSV descargado con éxito.');
+  showToast(`Exportados ${filtered.length} registro(s) a Excel (CSV) con éxito.`);
 }
 
 function renderTrash() {
@@ -665,9 +771,21 @@ els.tabTrash.addEventListener('click', () => switchTab('trash'));
 els.auditSearch.addEventListener('input', renderAudit);
 els.filterCounter.addEventListener('change', renderAudit);
 els.filterAction.addEventListener('change', renderAudit);
-els.filterDateFrom.addEventListener('change', renderAudit);
-els.filterDateTo.addEventListener('change', renderAudit);
+
+function onDateChange() {
+  populateCounterFilter();
+  renderAudit();
+}
+
+els.filterDateFrom.addEventListener('change', onDateChange);
+els.filterDateFrom.addEventListener('input', onDateChange);
+els.filterDateTo.addEventListener('change', onDateChange);
+els.filterDateTo.addEventListener('input', onDateChange);
+
 els.exportCsv.addEventListener('click', exportCsvFile);
+if (els.clearFilters) {
+  els.clearFilters.addEventListener('click', clearAllFilters);
+}
 els.emptyTrashBtn.addEventListener('click', emptyTrash);
 
 els.userMenu.addEventListener('click', () => {
