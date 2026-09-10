@@ -553,7 +553,7 @@ button:disabled, .count-button:disabled {
 
 .trash-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: 18px;
 }
 
@@ -1068,7 +1068,56 @@ button:disabled, .count-button:disabled {
   font-size: 16px !important;
 }
 
+/* =========================================================
+   COMPREHENSIVE RESPONSIVE ENHANCEMENTS (320px to Desktop)
+   ========================================================= */
+
+/* 1. Global anti-overflow safety */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* 2. Resilient text and flex containment */
+.member-info {
+  min-width: 0;
+  flex: 1;
+}
+.member-info strong,
+.member-info span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.activity-text {
+  min-width: 0;
+  flex: 1;
+}
+.activity-text strong,
+.activity-text small {
+  overflow-wrap: break-word;
+}
+.counter-item-content {
+  min-width: 0;
+  flex: 1;
+}
+.counter-item-content strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 3. Number scaling on small screens to prevent overflow */
+.count-number {
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+/* Medium Mobile & Tablet (< 760px) adjustments */
 @media (max-width: 760px) {
+  .topbar {
+    padding: 0 14px;
+  }
   .topbar-actions {
     gap: 8px;
   }
@@ -1076,6 +1125,16 @@ button:disabled, .count-button:disabled {
     display: inline-flex !important;
     padding: 0 10px;
     height: 34px;
+    font-size: 12px;
+  }
+  .workspace-header {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 14px;
+  }
+  .workspace-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
   .workspace-actions .chat-toggle-btn {
     position: relative;
@@ -1103,6 +1162,164 @@ button:disabled, .count-button:disabled {
     bottom: 0 !important;
     top: auto !important;
     margin: 0 !important;
+  }
+}
+
+/* Compact Mobile (< 540px) */
+@media (max-width: 540px) {
+  .panel-button, .pwa-install-btn {
+    padding: 0 10px !important;
+    font-size: 12px !important;
+    height: 34px !important;
+  }
+  .count-number {
+    font-size: clamp(52px, 18vw, 86px) !important;
+    letter-spacing: -3px !important;
+  }
+  .panel-filters-bar {
+    padding: 14px 12px !important;
+    gap: 10px !important;
+  }
+  .filter-group {
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
+  }
+  .filter-actions-group {
+    width: 100% !important;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .csv-btn, .clear-filters-btn {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+  .metrics-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+  }
+  .metric-card {
+    padding: 14px !important;
+  }
+  .metric-value {
+    font-size: 24px !important;
+  }
+  dialog {
+    width: calc(100% - 20px) !important;
+    padding: 20px 16px !important;
+  }
+  .dialog-actions {
+    flex-direction: column-reverse !important;
+    gap: 8px !important;
+  }
+  .dialog-actions .button {
+    width: 100% !important;
+  }
+}
+
+/* Extra Compact Mobile (< 440px) */
+@media (max-width: 440px) {
+  .history-filters {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+  .topbar {
+    padding: 0 10px !important;
+  }
+  .topbar .brand {
+    font-size: 15px !important;
+  }
+  .topbar-actions {
+    gap: 6px !important;
+  }
+  .avatar {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 10px !important;
+  }
+  .logout-topbar-btn {
+    padding: 0 8px !important;
+    font-size: 11px !important;
+    height: 32px !important;
+  }
+  .panel-container {
+    padding: 20px 12px 40px !important;
+  }
+  .workspace {
+    padding: 24px 12px 40px !important;
+  }
+  .counter-stage {
+    padding: 30px 12px 24px !important;
+  }
+  .count-button {
+    width: 58px !important;
+    height: 52px !important;
+    font-size: 30px !important;
+  }
+  .trash-card {
+    padding: 16px !important;
+  }
+  .trash-card-actions {
+    flex-direction: column;
+    gap: 8px !important;
+  }
+  .trash-card-actions button {
+    width: 100% !important;
+  }
+}
+
+/* Ultra Compact Mobile: 320px - 360px */
+@media (max-width: 360px) {
+  .topbar {
+    padding: 0 6px !important;
+  }
+  .topbar .brand span:not(.brand-mark) {
+    display: none; /* Keep the sleek '+' logo mark on 320px screens */
+  }
+  .panel-button .btn-text,
+  .pwa-install-btn .btn-text {
+    display: none; /* Show icons 📊 and 📲 on 320px screens */
+  }
+  .panel-button, .pwa-install-btn {
+    padding: 0 !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    height: 32px !important;
+    display: grid !important;
+    place-items: center !important;
+  }
+  .topbar-actions {
+    gap: 4px !important;
+  }
+  .logout-topbar-btn {
+    padding: 0 6px !important;
+    font-size: 10px !important;
+    height: 30px !important;
+  }
+  .avatar {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 9px !important;
+  }
+  .counter-item {
+    flex: 0 0 180px !important;
+    min-width: 180px !important;
+  }
+  .metrics-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .count-number {
+    font-size: clamp(44px, 15vw, 68px) !important;
+    letter-spacing: -1px !important;
+  }
+  .auth-panel {
+    padding: 24px 12px !important;
+  }
+  .auth-intro {
+    padding: 20px 14px !important;
+  }
+  .auth-intro h1 {
+    font-size: 32px !important;
   }
 }
 
