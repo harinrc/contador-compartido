@@ -1317,38 +1317,40 @@ if (els.chatInput) {
 }
 
 // Counter and App Listeners
-els.counterList.addEventListener('wheel', (e) => {
-  if (els.counterList.scrollWidth > els.counterList.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-    els.counterList.scrollLeft += e.deltaY;
-  }
-}, { passive: true });
-
-els.authForm.addEventListener('submit', handleAuth);
-els.authToggle.addEventListener('click', toggleAuth);
-els.demoLogin.addEventListener('click', startDemo);
-els.counterSearch.addEventListener('input', renderCounterList);
-els.counterDate.addEventListener('change', renderCounterList);
-els.activitySearch.addEventListener('input', renderActivity);
-els.activityFrom.addEventListener('change', renderActivity);
-els.activityTo.addEventListener('change', renderActivity);
-
-els.newCounter.addEventListener('click', () => els.counterDialog.showModal());
-els.emptyNewCounter.addEventListener('click', () => els.counterDialog.showModal());
-els.counterForm.addEventListener('submit', createCounter);
-els.closeCounterDialog.addEventListener('click', () => els.counterDialog.close());
-els.cancelCounterDialog.addEventListener('click', () => els.counterDialog.close());
-
-els.shareCounter.addEventListener('click', () => els.shareDialog.showModal());
-if (els.inviteMember) {
-  els.inviteMember.addEventListener('click', () => els.shareDialog.showModal());
+if (els.counterList) {
+  els.counterList.addEventListener('wheel', (e) => {
+    if (els.counterList.scrollWidth > els.counterList.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      els.counterList.scrollLeft += e.deltaY;
+    }
+  }, { passive: true });
 }
-els.shareForm.addEventListener('submit', inviteMember);
-els.closeShareDialog.addEventListener('click', () => els.shareDialog.close());
-els.cancelShareDialog.addEventListener('click', () => els.shareDialog.close());
 
-els.increment.addEventListener('click', () => changeCount(1));
-els.decrement.addEventListener('click', () => changeCount(-1));
-els.deleteCounter.addEventListener('click', deleteCounter);
+if (els.authForm) els.authForm.addEventListener('submit', handleAuth);
+if (els.authToggle) els.authToggle.addEventListener('click', toggleAuth);
+if (els.demoLogin) els.demoLogin.addEventListener('click', startDemo);
+if (els.counterSearch) els.counterSearch.addEventListener('input', renderCounterList);
+if (els.counterDate) els.counterDate.addEventListener('change', renderCounterList);
+if (els.activitySearch) els.activitySearch.addEventListener('input', renderActivity);
+if (els.activityFrom) els.activityFrom.addEventListener('change', renderActivity);
+if (els.activityTo) els.activityTo.addEventListener('change', renderActivity);
+
+if (els.newCounter) els.newCounter.addEventListener('click', () => els.counterDialog?.showModal());
+if (els.emptyNewCounter) els.emptyNewCounter.addEventListener('click', () => els.counterDialog?.showModal());
+if (els.counterForm) els.counterForm.addEventListener('submit', createCounter);
+if (els.closeCounterDialog) els.closeCounterDialog.addEventListener('click', () => els.counterDialog?.close());
+if (els.cancelCounterDialog) els.cancelCounterDialog.addEventListener('click', () => els.counterDialog?.close());
+
+if (els.shareCounter) els.shareCounter.addEventListener('click', () => els.shareDialog?.showModal());
+if (els.inviteMember) {
+  els.inviteMember.addEventListener('click', () => els.shareDialog?.showModal());
+}
+if (els.shareForm) els.shareForm.addEventListener('submit', inviteMember);
+if (els.closeShareDialog) els.closeShareDialog.addEventListener('click', () => els.shareDialog?.close());
+if (els.cancelShareDialog) els.cancelShareDialog.addEventListener('click', () => els.shareDialog?.close());
+
+if (els.increment) els.increment.addEventListener('click', () => changeCount(1));
+if (els.decrement) els.decrement.addEventListener('click', () => changeCount(-1));
+if (els.deleteCounter) els.deleteCounter.addEventListener('click', deleteCounter);
 
 document.addEventListener('keydown', (event) => {
   if (event.target.matches('input, textarea, select')) return;
