@@ -22,6 +22,17 @@ service cloud.firestore {
           (request.auth.uid in get(/databases/$(database)/documents/counters/$(counterId)).data.memberIds);
         allow update, delete: if false;
       }
+
+      match /messages/{messageId} {
+        allow read, create, update: if signedIn() &&
+          (request.auth.uid in get(/databases/$(database)/documents/counters/$(counterId)).data.memberIds);
+        allow delete: if false;
+      }
+
+      match /typing/{userId} {
+        allow read, write: if signedIn() &&
+          (request.auth.uid in get(/databases/$(database)/documents/counters/$(counterId)).data.memberIds);
+      }
     }
   }
 }

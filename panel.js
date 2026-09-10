@@ -46,6 +46,7 @@ const state = {
 const $ = (id) => document.getElementById(id);
 const els = {
   userMenu: $('user-menu'),
+  topbarLogout: $('topbar-logout'),
   connectionLabel: $('connection-label'),
   panelUserName: $('panel-user-name'),
   globalUserRole: $('global-user-role'),
@@ -788,7 +789,7 @@ if (els.clearFilters) {
 }
 els.emptyTrashBtn.addEventListener('click', emptyTrash);
 
-els.userMenu.addEventListener('click', () => {
+function handleLogout() {
   if (state.demo) {
     window.location.href = 'index.html';
     return;
@@ -796,7 +797,12 @@ els.userMenu.addEventListener('click', () => {
   signOut(auth).then(() => {
     window.location.href = 'index.html';
   });
-});
+}
+
+els.userMenu.addEventListener('click', handleLogout);
+if (els.topbarLogout) {
+  els.topbarLogout.addEventListener('click', handleLogout);
+}
 
 // Initialization
 if (firebaseReady) {

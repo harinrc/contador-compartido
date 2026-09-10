@@ -47,6 +47,13 @@ const state = {
   unsubscribeCounters: null,
   unsubscribeActive: null,
   unsubscribeEvents: null,
+  unsubscribeChat: null,
+  unsubscribeTyping: null,
+  chatMessages: [],
+  chatIsOpen: false,
+  typingTimer: null,
+  presenceInterval: null,
+  deferredPrompt: null,
   demo: false,
   register: false,
   recentCounterId: null,
@@ -67,6 +74,8 @@ const els = {
   authSubmit: $('auth-submit'),
   authToggle: $('auth-toggle'),
   demoLogin: $('demo-login'),
+  pwaInstallBtn: $('pwa-install-btn'),
+  topbarLogout: $('topbar-logout'),
   counterList: $('counter-list'),
   counterSearch: $('counter-search'),
   counterDate: $('counter-date'),
@@ -75,6 +84,14 @@ const els = {
   profileAvatar: $('profile-avatar'),
   userMenu: $('user-menu'),
   logout: $('logout'),
+  profileDialog: $('profile-dialog'),
+  closeProfileDialog: $('close-profile-dialog'),
+  modalProfileName: $('modal-profile-name'),
+  modalProfileAvatar: $('modal-profile-avatar'),
+  modalProfileDisplayName: $('modal-profile-display-name'),
+  modalProfileEmail: $('modal-profile-email'),
+  modalProfileStatus: $('modal-profile-status'),
+  modalLogout: $('modal-logout'),
   newCounter: $('new-counter'),
   emptyNewCounter: $('empty-new-counter'),
   emptyState: $('empty-state'),
@@ -82,6 +99,19 @@ const els = {
   counterRole: $('counter-role'),
   counterTitle: $('counter-title'),
   counterMeta: $('counter-meta'),
+  openCounterChat: $('open-counter-chat'),
+  chatUnreadCount: $('chat-unread-count'),
+  chatDialog: $('chat-dialog'),
+  closeChatDialog: $('close-chat-dialog'),
+  chatCounterTitle: $('chat-counter-title'),
+  chatCounterSubtitle: $('chat-counter-subtitle'),
+  chatMessagesList: $('chat-messages-list'),
+  chatWelcome: $('chat-welcome'),
+  chatTypingIndicator: $('chat-typing-indicator'),
+  chatTypingText: $('chat-typing-text'),
+  chatForm: $('chat-form'),
+  chatInput: $('chat-input'),
+  chatSend: $('chat-send'),
   shareCounter: $('share-counter'),
   deleteCounter: $('delete-counter'),
   countNumber: $('count-number'),
@@ -137,7 +167,8 @@ function timeAgo(date) {
   const seconds = Math.floor((Date.now() - value.getTime()) / 1000);
   if (seconds < 60) return 'Ahora';
   if (seconds < 3600) return `Hace ${Math.floor(seconds / 60)} min`;
-  return `Hace ${Math.floor(seconds / 3600)} h`;
+  if (seconds < 86400) return `Hace ${Math.floor(seconds / 3600)} h`;
+  return `Hace ${Math.floor(seconds / 86400)} d`;
 }
 
 function timestampValue(value) {
@@ -151,6 +182,28 @@ function formatDate(value) {
   return time
     ? new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(time))
     : 'Fecha pendiente';
+}
+
+function formatDateTime(value) {
+  const time = timestampValue(value);
+  return time
+    ? new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium', timeStyle: 'medium' }).format(new Date(time))
+    : 'Registrando...';
+}
+
+function formatMessageTime(value) {
+  const time = timestampValue(value);
+  if (!time) return 'Ahora';
+  const d = new Date(time);
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+function formatTimeOnly(time) {
+  if (!time) return '';
+  const d = new Date(time);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 function formatError(error) {
@@ -212,6 +265,8 @@ function setUser(user, demo = false) {
   els.connectionLabel.textContent = demo ? 'Modo demo' : 'Conectado';
   els.authView.classList.add('hidden');
   els.appView.classList.remove('hidden');
+
+  startPresenceTracking();
 }
 
 function resetApp() {
@@ -224,11 +279,16 @@ function resetApp() {
     els.counterRole.textContent = 'Propietario';
     els.counterRole.className = 'role-badge owner';
   }
+  els.openCounterChat.disabled = true;
   els.shareCounter.disabled = true;
   els.deleteCounter.disabled = true;
   els.increment.disabled = false;
   els.decrement.disabled = false;
   if (els.readOnlyNotice) els.readOnlyNotice.classList.add('hidden');
+  if (els.chatUnreadCount) els.chatUnreadCount.classList.add('hidden');
+
+  if (state.unsubscribeChat) state.unsubscribeChat();
+  if (state.unsubscribeTyping) state.unsubscribeTyping();
 }
 
 function demoData() {
@@ -243,10 +303,24 @@ function demoData() {
           ownerId: 'demo',
           memberIds: ['demo'],
           deleted: false,
-          createdAt: Date.now(),
+          createdAt: Date.now() - 3600000,
           updatedAt: Date.now(),
-          members: [{ email: 'tú', name: 'Tú', role: 'Propietario' }],
-          activity: [{ delta: 1, by: 'Tú', at: Date.now() }]
+          members: [
+            { email: 'tú', name: 'Tú', role: 'Propietario', isOnline: true, lastSeen: Date.now() },
+            { email: 'carlos@empresa.com', name: 'Carlos', role: 'Administrador', isOnline: false, lastSeen: Date.now() - 900000 },
+            { email: 'ana@empresa.com', name: 'Ana', role: 'Operador', isOnline: true, lastSeen: Date.now() }
+          ],
+          activity: [{ delta: 1, by: 'Tú', at: Date.now() }],
+          messages: [
+            {
+              id: 'msg-1',
+              text: '¡Bienvenidos al conteo colaborativo!',
+              senderId: 'carlos',
+              senderName: 'Carlos',
+              at: Date.now() - 1800000,
+              readBy: [{ name: 'Ana', at: Date.now() - 1200000 }]
+            }
+          ]
         }
       ]
     };
@@ -383,9 +457,12 @@ function selectCounter(id) {
   if (state.demo) {
     state.events = (counter.activity || []).slice().reverse();
     renderActivity();
+    subscribeDemoChat(counter);
   } else {
     subscribeActiveCounter(id);
     subscribeEvents(id);
+    subscribeCounterChat(id);
+    subscribeTyping(id);
   }
 }
 
@@ -425,6 +502,7 @@ function renderActiveCounter(counter) {
     els.counterRole.className = `role-badge ${badgeClass}`;
   }
 
+  els.openCounterChat.disabled = false;
   els.shareCounter.disabled = !isAdmin;
   els.deleteCounter.disabled = !isAdmin;
   els.deleteCounter.title = isAdmin ? 'Mover a papelera' : 'Solo Administradores o Propietarios pueden mover a papelera';
@@ -453,13 +531,6 @@ function eventDate(item) {
   if (item.createdAt?.toDate) return item.createdAt.toDate();
   if (item.at) return new Date(item.at);
   return null;
-}
-
-function formatDateTime(item) {
-  const date = eventDate(item);
-  return date
-    ? new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium', timeStyle: 'medium' }).format(date)
-    : 'Registrando...';
 }
 
 function renderActivity() {
@@ -519,9 +590,74 @@ function subscribeEvents(id) {
   );
 }
 
+/* ================= PRESENCE TRACKING ================= */
+
+function getMemberPresence(member) {
+  const isSelf =
+    (member.userId && member.userId === state.user?.uid) ||
+    (member.email && member.email.toLowerCase() === state.user?.email?.toLowerCase()) ||
+    (state.demo && (member.name === 'Tú' || member.email === 'tú'));
+
+  if (isSelf) {
+    return { isOnline: true, text: 'En línea ahora' };
+  }
+
+  if (state.demo) {
+    if (member.isOnline) return { isOnline: true, text: 'En línea ahora' };
+    const lastTime = member.lastSeen || Date.now() - 1800000;
+    return { isOnline: false, text: `Desconectado ${timeAgo(lastTime).toLowerCase()}` };
+  }
+
+  const lastTime = timestampValue(member.lastSeen);
+  if (!lastTime) return { isOnline: false, text: 'Desconectado' };
+  const diff = Date.now() - lastTime;
+  if (member.isOnline && diff < 90000) {
+    return { isOnline: true, text: 'En línea ahora' };
+  }
+  return { isOnline: false, text: `Desconectado ${timeAgo(lastTime).toLowerCase()}` };
+}
+
+function startPresenceTracking() {
+  if (state.presenceInterval) clearInterval(state.presenceInterval);
+
+  if (state.demo) {
+    const updateDemoPresence = () => {
+      const data = demoData();
+      const me = data.counters.flatMap((c) => c.members || []).find((m) => m.email === 'tú' || m.name === 'Tú');
+      if (me) {
+        me.isOnline = true;
+        me.lastSeen = Date.now();
+        saveDemo(data);
+      }
+    };
+    updateDemoPresence();
+    state.presenceInterval = setInterval(updateDemoPresence, 35000);
+    return;
+  }
+
+  if (!firebaseReady || !state.user) return;
+
+  const userDocRef = doc(db, 'users', state.user.uid);
+  const markOnline = (online = true) => {
+    setDoc(userDocRef, { isOnline: online, lastSeen: serverTimestamp() }, { merge: true }).catch(() => {});
+  };
+
+  markOnline(true);
+  state.presenceInterval = setInterval(() => markOnline(true), 40000);
+
+  document.addEventListener('visibilitychange', () => {
+    markOnline(!document.hidden);
+  });
+
+  window.addEventListener('beforeunload', () => {
+    markOnline(false);
+  });
+}
+
 function renderMembers(counter) {
   els.memberList.innerHTML = '';
-  const members = counter.members || [{ name: 'Tú', email: state.user?.email || 'modo demo', role: 'Propietario' }];
+  const members = counter.members || [{ name: 'Tú', email: state.user?.email || 'modo demo', role: 'Propietario', isOnline: true, lastSeen: Date.now() }];
+
   members.forEach((member) => {
     const row = document.createElement('div');
     row.className = 'member-row';
@@ -531,19 +667,261 @@ function renderMembers(counter) {
       memberRole === 'Administrador' ? 'admin' :
       memberRole === 'Operador' ? 'editor' : 'viewer';
 
+    const presence = getMemberPresence(member);
+
     row.innerHTML = `
-      <span class="member-avatar">${initials(member.name || member.email)}</span>
-      <span class="member-info">
-        <strong>${escapeHtml(member.name || member.email)}</strong>
+      <div class="member-avatar-wrapper">
+        <span class="member-avatar">${initials(member.name || member.email)}</span>
+        <span class="presence-dot ${presence.isOnline ? 'online' : 'offline'}" title="${presence.isOnline ? 'En línea' : 'Desconectado'}"></span>
+      </div>
+      <div class="member-info">
+        <div class="member-name-row">
+          <strong>${escapeHtml(member.name || member.email)}</strong>
+          <span class="presence-label ${presence.isOnline ? 'online' : 'offline'}">${presence.isOnline ? '🟢 En línea' : `⚪ ${presence.text}`}</span>
+        </div>
         <span>
           <span class="role-badge ${badgeClass}" style="font-size: 0.68rem; padding: 2px 6px;">${escapeHtml(memberRole)}</span>
           · ${escapeHtml(member.email || '')}
         </span>
-      </span>
+      </div>
     `;
     els.memberList.appendChild(row);
   });
 }
+
+/* ================= CHAT EN TIEMPO REAL ================= */
+
+function getChatReadStorageKey(counterId) {
+  const uid = state.user?.uid || 'demo';
+  return `cj_last_read_${counterId}_${uid}`;
+}
+
+function updateUnreadBadge(counterId) {
+  const lastRead = Number(localStorage.getItem(getChatReadStorageKey(counterId)) || 0);
+  const myUid = state.user?.uid || 'demo';
+
+  const unreadCount = state.chatMessages.filter((msg) => {
+    const msgTime = timestampValue(msg.createdAt || msg.at);
+    return msgTime > lastRead && msg.senderId !== myUid;
+  }).length;
+
+  if (unreadCount > 0 && !state.chatIsOpen) {
+    els.chatUnreadCount.textContent = unreadCount > 99 ? '99+' : unreadCount;
+    els.chatUnreadCount.classList.remove('hidden');
+  } else {
+    els.chatUnreadCount.classList.add('hidden');
+  }
+}
+
+function markMessagesAsRead(counterId) {
+  localStorage.setItem(getChatReadStorageKey(counterId), Date.now().toString());
+  els.chatUnreadCount.classList.add('hidden');
+
+  if (state.demo) {
+    const data = demoData();
+    const target = data.counters.find((c) => c.id === counterId);
+    if (target && target.messages) {
+      target.messages.forEach((msg) => {
+        if (msg.senderId !== 'demo') {
+          msg.readBy = msg.readBy || [];
+          if (!msg.readBy.some((r) => r.name === 'Tú')) {
+            msg.readBy.push({ name: 'Tú', at: Date.now() });
+          }
+        }
+      });
+      saveDemo(data);
+    }
+    return;
+  }
+
+  if (!firebaseReady || !state.user) return;
+  const myUid = state.user.uid;
+  const myName = state.user.displayName || 'Usuario';
+
+  state.chatMessages.forEach((msg) => {
+    if (msg.id && msg.senderId !== myUid) {
+      const alreadyRead = (msg.readBy || []).some((r) => r.userId === myUid);
+      if (!alreadyRead) {
+        updateDoc(doc(db, 'counters', counterId, 'messages', msg.id), {
+          readBy: arrayUnion({ userId: myUid, name: myName, at: Date.now() })
+        }).catch(() => {});
+      }
+    }
+  });
+}
+
+function renderChatMessages() {
+  const list = els.chatMessagesList;
+  list.innerHTML = '';
+
+  if (!state.chatMessages.length) {
+    list.appendChild(els.chatWelcome);
+    return;
+  }
+
+  const myUid = state.user?.uid || 'demo';
+
+  state.chatMessages.forEach((msg) => {
+    const isMine = msg.senderId === myUid;
+    const item = document.createElement('div');
+    item.className = `chat-msg ${isMine ? 'mine' : 'theirs'}`;
+
+    const timeStr = formatMessageTime(msg.createdAt || msg.at);
+
+    let seenHtml = '';
+    if (isMine) {
+      const others = (msg.readBy || []).filter((r) => r.name !== 'Tú' && r.userId !== myUid);
+      if (others.length) {
+        const seenNames = others.map((r) => `${r.name} (${formatTimeOnly(r.at)})`).join(', ');
+        seenHtml = `<span class="chat-msg-seen" title="Visto por ${seenNames}">✓✓ Visto por ${escapeHtml(seenNames)}</span>`;
+      } else {
+        seenHtml = '<span class="chat-msg-sent">✓ Enviado</span>';
+      }
+    }
+
+    item.innerHTML = `
+      <span class="chat-msg-author">${escapeHtml(msg.senderName || 'Colaborador')}</span>
+      <div class="chat-msg-bubble">${escapeHtml(msg.text)}</div>
+      <div class="chat-msg-meta">
+        <span>${timeStr}</span>
+        ${seenHtml}
+      </div>
+    `;
+    list.appendChild(item);
+  });
+
+  list.scrollTop = list.scrollHeight;
+}
+
+function subscribeCounterChat(counterId) {
+  if (state.unsubscribeChat) state.unsubscribeChat();
+
+  const q = query(
+    collection(db, 'counters', counterId, 'messages'),
+    orderBy('createdAt', 'asc')
+  );
+
+  state.unsubscribeChat = onSnapshot(q, (snapshot) => {
+    state.chatMessages = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    updateUnreadBadge(counterId);
+    if (state.chatIsOpen) {
+      renderChatMessages();
+      markMessagesAsRead(counterId);
+    }
+  });
+}
+
+function subscribeDemoChat(counter) {
+  state.chatMessages = counter.messages || [];
+  updateUnreadBadge(counter.id);
+  if (state.chatIsOpen) {
+    renderChatMessages();
+    markMessagesAsRead(counter.id);
+  }
+}
+
+function subscribeTyping(counterId) {
+  if (state.unsubscribeTyping) state.unsubscribeTyping();
+
+  state.unsubscribeTyping = onSnapshot(collection(db, 'counters', counterId, 'typing'), (snapshot) => {
+    const myUid = state.user?.uid;
+    const now = Date.now();
+    const typingUsers = [];
+
+    snapshot.forEach((docSnap) => {
+      if (docSnap.id !== myUid) {
+        const data = docSnap.data();
+        const time = timestampValue(data.at);
+        if (data.typing && now - time < 5000) {
+          typingUsers.push(data.name || 'Alguien');
+        }
+      }
+    });
+
+    if (typingUsers.length && state.chatIsOpen) {
+      els.chatTypingText.textContent = `${typingUsers.join(', ')} está escribiendo...`;
+      els.chatTypingIndicator.classList.remove('hidden');
+    } else {
+      els.chatTypingIndicator.classList.add('hidden');
+    }
+  });
+}
+
+function emitTyping(isTyping = true) {
+  if (state.demo || !firebaseReady || !state.user || !state.activeCounter) return;
+
+  const typingRef = doc(db, 'counters', state.activeCounter.id, 'typing', state.user.uid);
+  setDoc(typingRef, {
+    name: state.user.displayName || 'Usuario',
+    typing: isTyping,
+    at: serverTimestamp()
+  }, { merge: true }).catch(() => {});
+}
+
+async function sendChatMessage(event) {
+  event.preventDefault();
+  const text = els.chatInput.value.trim();
+  if (!text || !state.activeCounter) return;
+
+  els.chatInput.value = '';
+  emitTyping(false);
+
+  const myUid = state.user?.uid || 'demo';
+  const myName = state.user?.displayName || state.user?.name || 'Tú';
+  const now = Date.now();
+
+  const message = {
+    text,
+    senderId: myUid,
+    senderName: myName,
+    senderEmail: state.user?.email || 'demo',
+    at: now,
+    readBy: []
+  };
+
+  if (state.demo) {
+    const data = demoData();
+    const target = data.counters.find((c) => c.id === state.activeCounter.id);
+    if (target) {
+      target.messages = [...(target.messages || []), message];
+      saveDemo(data);
+      state.chatMessages = target.messages;
+      renderChatMessages();
+      markMessagesAsRead(target.id);
+    }
+    return;
+  }
+
+  try {
+    await addDoc(collection(db, 'counters', state.activeCounter.id, 'messages'), {
+      ...message,
+      createdAt: serverTimestamp()
+    });
+    markMessagesAsRead(state.activeCounter.id);
+  } catch {
+    showToast('No se pudo enviar el mensaje.', true);
+  }
+}
+
+function openChat() {
+  if (!state.activeCounter) return;
+  state.chatIsOpen = true;
+  els.chatCounterTitle.textContent = `Chat: ${state.activeCounter.name}`;
+  const count = (state.activeCounter.members || []).length;
+  els.chatCounterSubtitle.textContent = `${count} participante${count === 1 ? '' : 's'} · En tiempo real`;
+  els.chatDialog.showModal();
+  renderChatMessages();
+  markMessagesAsRead(state.activeCounter.id);
+  els.chatInput.focus();
+}
+
+function closeChat() {
+  state.chatIsOpen = false;
+  emitTyping(false);
+  els.chatDialog.close();
+}
+
+/* ================= COUNTER ACTIONS ================= */
 
 async function changeCount(delta) {
   const counter = state.activeCounter;
@@ -617,8 +995,9 @@ async function createCounter(event) {
       deleted: false,
       createdAt: now,
       updatedAt: now,
-      members: [{ email: 'tú', name: 'Tú', role: 'Propietario' }],
-      activity: []
+      members: [{ email: 'tú', name: 'Tú', role: 'Propietario', isOnline: true, lastSeen: Date.now() }],
+      activity: [],
+      messages: []
     };
     data.counters.push(counter);
     saveDemo(data);
@@ -645,7 +1024,9 @@ async function createCounter(event) {
           email: state.user.email,
           name: state.user.displayName || 'Propietario',
           role: 'Propietario',
-          userId: state.user.uid
+          userId: state.user.uid,
+          isOnline: true,
+          lastSeen: serverTimestamp()
         }
       ],
       activity: [],
@@ -736,7 +1117,10 @@ async function inviteMember(event) {
   if (state.demo) {
     const data = demoData();
     const target = data.counters.find((item) => item.id === state.activeCounter.id);
-    target.members = [...(target.members || []), { email, name: email.split('@')[0], role }];
+    target.members = [
+      ...(target.members || []),
+      { email, name: email.split('@')[0], role, isOnline: false, lastSeen: Date.now() - 3600000 }
+    ];
     saveDemo(data);
     state.counters = data.counters;
     state.activeCounter = target;
@@ -760,7 +1144,9 @@ async function inviteMember(event) {
         email,
         name: invitedData.name || email.split('@')[0],
         role,
-        userId: invited.id
+        userId: invited.id,
+        isOnline: invitedData.isOnline || false,
+        lastSeen: invitedData.lastSeen || serverTimestamp()
       })
     });
 
@@ -792,7 +1178,12 @@ async function handleAuth(event) {
       const credentials = await createUserWithEmailAndPassword(auth, email, password);
       const name = els.authName.value.trim() || email.split('@')[0];
       await updateProfile(credentials.user, { displayName: name });
-      await setDoc(doc(db, 'users', credentials.user.uid), { email, name });
+      await setDoc(doc(db, 'users', credentials.user.uid), {
+        email,
+        name,
+        isOnline: true,
+        lastSeen: serverTimestamp()
+      });
     }
   } catch (error) {
     showToast(formatError(error), true);
@@ -812,14 +1203,41 @@ function toggleAuth() {
     : '¿No tienes cuenta? Regístrate';
 }
 
+function openProfileDialog() {
+  const name = state.user?.displayName || state.user?.name || 'Tu cuenta';
+  const email = state.user?.email || (state.demo ? 'Modo demo en este navegador' : '');
+
+  els.modalProfileName.textContent = name;
+  els.modalProfileDisplayName.textContent = name;
+  els.modalProfileEmail.textContent = email;
+  els.modalProfileAvatar.textContent = initials(name);
+  els.modalProfileStatus.textContent = '🟢 En línea ahora';
+  els.profileDialog.showModal();
+}
+
 function logout() {
+  if (state.presenceInterval) clearInterval(state.presenceInterval);
+
   if (state.demo) {
     state.demo = false;
     state.user = null;
+    if (els.profileDialog) els.profileDialog.close();
     els.appView.classList.add('hidden');
     els.authView.classList.remove('hidden');
     return;
   }
+
+  if (firebaseReady && state.user) {
+    const userDocRef = doc(db, 'users', state.user.uid);
+    setDoc(userDocRef, { isOnline: false, lastSeen: serverTimestamp() }, { merge: true })
+      .finally(() => {
+        if (els.profileDialog) els.profileDialog.close();
+        signOut(auth);
+      });
+    return;
+  }
+
+  if (els.profileDialog) els.profileDialog.close();
   signOut(auth);
 }
 
@@ -828,6 +1246,77 @@ function startDemo() {
   loadCounters();
 }
 
+/* ================= EVENT LISTENERS ================= */
+
+// PWA Install Prompt handling
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  state.deferredPrompt = e;
+  if (els.pwaInstallBtn) els.pwaInstallBtn.classList.remove('hidden');
+});
+
+window.addEventListener('appinstalled', () => {
+  if (els.pwaInstallBtn) els.pwaInstallBtn.classList.add('hidden');
+  state.deferredPrompt = null;
+  showToast('¡Cuenta Juntos se ha instalado correctamente!');
+});
+
+// Check if running as installed PWA
+if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+  if (els.pwaInstallBtn) els.pwaInstallBtn.classList.add('hidden');
+}
+
+if (els.pwaInstallBtn) {
+  els.pwaInstallBtn.addEventListener('click', async () => {
+    if (state.deferredPrompt) {
+      state.deferredPrompt.prompt();
+      const { outcome } = await state.deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        els.pwaInstallBtn.classList.add('hidden');
+        state.deferredPrompt = null;
+      }
+    } else {
+      showToast('Para instalar en este dispositivo, selecciona "Añadir a pantalla de inicio" en tu navegador.');
+    }
+  });
+}
+
+// User Profile & Logout Listeners
+if (els.userMenu) {
+  els.userMenu.addEventListener('click', openProfileDialog);
+}
+if (els.topbarLogout) {
+  els.topbarLogout.addEventListener('click', logout);
+}
+if (els.logout) {
+  els.logout.addEventListener('click', logout);
+}
+if (els.modalLogout) {
+  els.modalLogout.addEventListener('click', logout);
+}
+if (els.closeProfileDialog) {
+  els.closeProfileDialog.addEventListener('click', () => els.profileDialog.close());
+}
+
+// Chat Listeners
+if (els.openCounterChat) {
+  els.openCounterChat.addEventListener('click', openChat);
+}
+if (els.closeChatDialog) {
+  els.closeChatDialog.addEventListener('click', closeChat);
+}
+if (els.chatForm) {
+  els.chatForm.addEventListener('submit', sendChatMessage);
+}
+if (els.chatInput) {
+  els.chatInput.addEventListener('input', () => {
+    emitTyping(true);
+    if (state.typingTimer) clearTimeout(state.typingTimer);
+    state.typingTimer = setTimeout(() => emitTyping(false), 3000);
+  });
+}
+
+// Counter and App Listeners
 els.counterList.addEventListener('wheel', (e) => {
   if (els.counterList.scrollWidth > els.counterList.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
     els.counterList.scrollLeft += e.deltaY;
@@ -860,8 +1349,6 @@ els.cancelShareDialog.addEventListener('click', () => els.shareDialog.close());
 els.increment.addEventListener('click', () => changeCount(1));
 els.decrement.addEventListener('click', () => changeCount(-1));
 els.deleteCounter.addEventListener('click', deleteCounter);
-els.logout.addEventListener('click', logout);
-els.userMenu.addEventListener('click', logout);
 
 document.addEventListener('keydown', (event) => {
   if (event.target.matches('input, textarea, select')) return;
