@@ -1063,9 +1063,13 @@ function handleLogout() {
     window.location.href = 'index.html';
     return;
   }
-  signOut(auth).then(() => {
-    window.location.href = 'index.html';
-  });
+  signOut(auth)
+    .then(() => {
+      window.location.href = 'index.html';
+    })
+    .catch(() => {
+      window.location.href = 'index.html';
+    });
 }
 
 els.userMenu.addEventListener('click', handleLogout);

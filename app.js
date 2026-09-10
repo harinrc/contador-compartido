@@ -1185,7 +1185,7 @@ async function createCounter(event) {
           role: 'Propietario',
           userId: state.user.uid,
           isOnline: true,
-          lastSeen: serverTimestamp()
+          lastSeen: Date.now()
         }
       ],
       activity: [],
@@ -1198,7 +1198,8 @@ async function createCounter(event) {
     showToast('Contador creado');
     markCounterRecent(newCounter.id);
     selectCounter(newCounter.id);
-  } catch {
+  } catch (err) {
+    console.error('Error al crear contador:', err);
     showToast('No se pudo crear el contador.', true);
   }
 }
@@ -1305,7 +1306,7 @@ async function inviteMember(event) {
         role,
         userId: invited.id,
         isOnline: invitedData.isOnline || false,
-        lastSeen: invitedData.lastSeen || serverTimestamp()
+        lastSeen: timestampValue(invitedData.lastSeen) || Date.now()
       })
     });
 
@@ -1374,30 +1375,74 @@ function openProfileDialog() {
   els.profileDialog.showModal();
 }
 
+function handleSignedOutUI() {
+  if (state.presenceInterval) clearInterval(state.presenceInterval);
+  state.user = null;
+  state.demo = false;
+  state.counters = [];
+  state.activeCounter = null;
+  state.events = [];
+  state.chatMessages = [];
+  resetApp();
+
+  if (els.profileDialog) els.profileDialog.close();
+  if (els.chatDialog) els.chatDialog.close();
+  if (els.counterDialog) els.counterDialog.close();
+  if (els.shareDialog) els.shareDialog.close();
+
+  els.appView.classList.add('hidden');
+  els.authView.classList.remove('hidden');
+  els.connectionLabel.textContent = 'Desconectado';
+
+  if (state.unsubscribeCounters) {
+    state.unsubscribeCounters();
+    state.unsubscribeCounters = null;
+  }
+  if (state.unsubscribeActive) {
+    state.unsubscribeActive();
+    state.unsubscribeActive = null;
+  }
+  if (state.unsubscribeEvents) {
+    state.unsubscribeEvents();
+    state.unsubscribeEvents = null;
+  }
+  if (state.unsubscribeChat) {
+    state.unsubscribeChat();
+    state.unsubscribeChat = null;
+  }
+  if (state.unsubscribeTyping) {
+    state.unsubscribeTyping();
+    state.unsubscribeTyping = null;
+  }
+}
+
 function logout() {
   if (state.presenceInterval) clearInterval(state.presenceInterval);
 
   if (state.demo) {
-    state.demo = false;
-    state.user = null;
-    if (els.profileDialog) els.profileDialog.close();
-    els.appView.classList.add('hidden');
-    els.authView.classList.remove('hidden');
+    handleSignedOutUI();
     return;
   }
 
   if (firebaseReady && state.user) {
     const userDocRef = doc(db, 'users', state.user.uid);
     setDoc(userDocRef, { isOnline: false, lastSeen: serverTimestamp() }, { merge: true })
+      .catch(() => {})
       .finally(() => {
-        if (els.profileDialog) els.profileDialog.close();
-        signOut(auth);
+        signOut(auth)
+          .then(() => handleSignedOutUI())
+          .catch(() => handleSignedOutUI());
       });
     return;
   }
 
-  if (els.profileDialog) els.profileDialog.close();
-  signOut(auth);
+  if (firebaseReady) {
+    signOut(auth)
+      .then(() => handleSignedOutUI())
+      .catch(() => handleSignedOutUI());
+  } else {
+    handleSignedOutUI();
+  }
 }
 
 function startDemo() {
@@ -1542,6 +1587,8 @@ if (firebaseReady) {
     if (user) {
       setUser(user);
       loadCounters();
+    } else {
+      handleSignedOutUI();
     }
   });
 } else {
