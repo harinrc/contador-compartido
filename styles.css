@@ -24,6 +24,106 @@ html {
 .member-list::-webkit-scrollbar-thumb:hover {
   background: #9db5c4;
 }
+
+/* Animations for Real-time Counter Changes */
+@keyframes counter-card-pop {
+  0% {
+    transform: scale(0.96);
+    box-shadow: 0 0 0 0 rgba(239, 107, 91, 0.7);
+  }
+  40% {
+    transform: scale(1.03);
+    box-shadow: 0 0 0 8px rgba(239, 107, 91, 0.25), 0 8px 20px rgba(239, 107, 91, 0.2);
+    border-color: var(--coral);
+  }
+  70% {
+    transform: scale(1.01);
+    box-shadow: 0 0 0 4px rgba(239, 107, 91, 0.12);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 2px 8px rgba(16, 42, 67, 0.06);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+@keyframes number-pop {
+  0% {
+    transform: scale(0.92);
+  }
+  50% {
+    transform: scale(1.12);
+    color: var(--mint);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes counter-icon-bounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.25) rotate(10deg); }
+}
+
+.counter-item.just-updated {
+  animation: counter-card-pop 0.9s cubic-bezier(0.25, 1, 0.5, 1);
+  border-color: var(--coral) !important;
+  position: relative;
+  z-index: 2;
+}
+
+.counter-item.just-updated .counter-icon {
+  background: var(--coral) !important;
+  color: #fff !important;
+  animation: counter-icon-bounce 0.6s ease;
+}
+
+.recent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--coral-dark);
+  background: #fff0ee;
+  padding: 3px 7px;
+  border-radius: 12px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.recent-badge .recent-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--coral);
+  position: relative;
+  display: inline-block;
+}
+
+.recent-badge .recent-dot::after {
+  content: '';
+  position: absolute;
+  top: -1px; left: -1px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--coral);
+  animation: pulse-ring 1.2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+.count-number.bump {
+  animation: number-pop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
 .search-field{display:flex;align-items:center;gap:8px;margin:18px 0 12px;padding:0 12px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--muted)}.search-field input{width:100%;border:0;outline:0;padding:10px 0;background:transparent;color:var(--ink);font-size:13px}.counter-date-filter{display:grid;gap:5px;color:var(--muted);font-size:11px;font-weight:700}.counter-date-filter input{width:100%;border:1px solid var(--line);border-radius:6px;padding:9px 10px;background:var(--paper);color:var(--ink);outline:0;font-size:12px}.history-filters{display:grid;grid-template-columns:minmax(160px,1fr) repeat(2,minmax(110px,145px));gap:8px;margin:16px 0}.history-filters input{width:100%;min-width:0;border:1px solid var(--line);border-radius:6px;padding:9px 10px;background:var(--paper);color:var(--ink);outline:0;font-size:12px}.history-filters input:focus,.search-field:focus-within,.counter-date-filter input:focus{border-color:var(--coral)}.history-filters label{display:grid;gap:5px;color:var(--muted);font-size:11px;font-weight:700}.activity-text{display:flex;flex-direction:column;gap:3px}.activity-text small{color:var(--muted);font-size:11px}.activity-section{min-width:0}.activity-list{max-height:430px;overflow-y:auto;padding-right:8px;scrollbar-width:thin;scrollbar-color:var(--line) transparent}.counter-item-content{min-width:0;flex:1}.counter-item-content strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.counter-item-date{display:block;color:#84919a;font-size:10px;font-weight:400;margin-top:4px;white-space:normal}
 @media(max-width:700px){.history-filters{grid-template-columns:1fr 1fr}.history-filters input[type="search"]{grid-column:1/-1}}
 .toast{position:fixed;z-index:10;left:50%;top:20px;transform:translate(-50%,-20px);padding:12px 17px;border-radius:7px;background:var(--navy);color:#fff;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}.toast.visible{opacity:1;transform:translate(-50%,0)}.toast.error{background:var(--coral-dark)}
